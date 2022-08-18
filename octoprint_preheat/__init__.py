@@ -46,7 +46,10 @@ class PreheatAPIPlugin(
 					on_conplete_send_gcode_command = "M117 Preheat complete. ; Update LCD\nM300 S660 P200 ; Beep",
 					use_fallback_when_no_file_selected = False,
 					max_gcode_lines = 1000,
-					use_m109 = False
+					use_m109 = False,
+					hotend_heating_commands = "M104, M109",
+					bed_heating_commands = "M140, M190",
+					chamber_heating_commands = "M141, M191"
 		)
 
 					
@@ -100,6 +103,13 @@ class PreheatAPIPlugin(
 		max_lines = self._settings.get_int(["max_gcode_lines"])
 		temperatures = dict()
 		current_tool = "tool0"
+		
+		def _is_heating_command(line, commands):
+			for cmd in commands.split(","):
+				if line.startswith(cmd.strip()):
+					return True
+			return False
+
 		try:
 			with open(path_on_disk, "r") as file:
 				while max_lines > 0:
@@ -112,15 +122,15 @@ class PreheatAPIPlugin(
 							new_tool = "tool0"
 						if PrinterInterface.valid_heater_regex.match(new_tool):
 							current_tool = new_tool
-					if enable_tool and (line.startswith("M104") or line.startswith("M109")): # Set tool temperature
+					if enable_tool and _is_heating_command(line, self._settings.get(["hotend_heating_commands"])): # Set tool temperature
 						tool, temperature = self.parse_line(line, current_tool)
 						if temperature != None and tool not in temperatures:
 							temperatures[tool] = temperature
-					if enable_bed and (line.startswith("M190") or line.startswith("M140")):	# Set bed temperature
+					if enable_bed and _is_heating_command(line, self._settings.get(["bed_heating_commands"])):	# Set bed temperature
 						_, temperature = self.parse_line(line)
 						if temperature != None and "bed" not in temperatures:
 							temperatures["bed"] = temperature
-					if enable_chamber and (line.startswith("M191") or line.startswith("M141")):	# Set chamber temperature
+					if enable_chamber and _is_heating_command(line, self._settings.get(["chamber_heating_commands"])):	# Set chamber temperature
 						_, temperature = self.parse_line(line)
 						if temperature != None and "chamber" not in temperatures:
 							temperatures["chamber"] = temperature
